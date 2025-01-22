@@ -1,0 +1,15 @@
+apiServer: "192.168.137.134:6443"
+proxyAddress: "" # When not using a proxy, set it to empty
+auth:
+  - tokenFile: "./auth/token" # Token file path (when token and crt are set at the same time, token authentication takes precedence)
+  - kubeconfig: ""
+  - crt: ""  # crt file path
+    key: ""  # key file path
+ssh:  #Controlled node (token will be obtained on this node)
+  - ip: "192.168.137.136"
+    port: "22"
+    username: "root"
+    password: "123123"
+    privateKeyFile: "" # When passwd and keyFile are set at the same time, private key login is given priority.
+    nodeName: "node2" # Controlled node name
+

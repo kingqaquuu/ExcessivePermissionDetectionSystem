@@ -1,0 +1,2 @@
+# ExcessivePermissionDetectionSystem
+K8s过度权限漏洞检测系统，为kingqaquuu毕设所设计
