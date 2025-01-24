@@ -15,21 +15,19 @@ func main() {
 func init() {
 	viper.SetConfigFile(".\\conf\\conf.yaml")
 	if err := viper.ReadInConfig(); err != nil {
-		fmt.Printf("Error reading config file: %s\n", err)
+		fmt.Printf("读取配置文件失败: %s\n", err)
 		return
 	}
-	conf.ApiServer = viper.GetString("apiServer")
-	conf.ProxyAddress = viper.GetString("proxyAddress")
 
-	conf.TokenFile = viper.GetString("auth.0.tokenFile")
-	conf.Kubeconfig = viper.GetString("auth.1.kubeconfig")
-	conf.AdminCert = viper.GetString("auth.2.crt")
-	conf.AdminCert = viper.GetString("auth.2.key")
-
-	var sshConfig models.SSHConfig
-	if err := viper.UnmarshalKey("ssh.0", &sshConfig); err != nil {
-		fmt.Printf("Error unmarshalling SSH config: %s\n", err)
+	var k8sConfig models.K8sEPDSConfig
+	if err := viper.UnmarshalKey("k8s.0",&k8sConfig.K8s);err!=nil{
+		fmt.Printf("解析 K8s 配置失败: %s\n", err)
 		return
 	}
-	conf.SSH = sshConfig
+	conf.Config.K8s	= k8sConfig.K8s
+	if err := viper.UnmarshalKey("ssh.0", &k8sConfig.SSH); err != nil {
+		fmt.Printf("解析 SSH 配置失败: %s\n", err)
+		return
+	}
+	conf.Config.SSH = k8sConfig.SSH
 }

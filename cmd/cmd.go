@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 	"k8sEPDS/conf"
+	"k8sEPDS/models"
 	exp "k8sEPDS/pkg/exploit"
 	"k8sEPDS/pkg/scan"
-	"k8sEPDS/models"
 	"reflect"
 	"sort"
 	"strings"
@@ -18,20 +18,17 @@ var (
 )
 
 func Main() {
-	ssh = conf.SSH
+	ssh = conf.Config.SSH
 	operation := ""
 	for {
-		fmt.Print("[scan/exp/help] Input the operation: ")
+		fmt.Print("[scan/exp/resetconfig/help] Input the operation: ")
 		fmt.Scan(&operation)
 		switch operation {
 		case "scan":
 			{
-				if len(saBindingMap) == 0 {
-					saBindingMap = scan.GetSaBinding2()
-				}
-				if len(criticalSAs) == 0 {
-					criticalSAs = scan.GetCriticalSA(scan.NewGetSA2(saBindingMap), ssh.Nodename)
-				}
+				saBindingMap = scan.GetSaBinding()
+				criticalSAs = scan.GetCriticalSA(scan.GetSA(saBindingMap), ssh.Nodename)
+
 				fmt.Println()
 				for _, criticalSA := range criticalSAs {
 					if !criticalSA.SA0.IsMounted {
@@ -57,7 +54,7 @@ func Main() {
 			{
 				fmt.Scan(&operation)
 				if len(saBindingMap) == 0 {
-					saBindingMap = scan.GetSaBinding2()
+					saBindingMap = scan.GetSaBinding()
 				}
 				for sa, permission := range saBindingMap {
 					if strings.Contains(sa, operation) {
@@ -74,7 +71,7 @@ func Main() {
 		case "getsas":
 			{
 				if len(saBindingMap) == 0 {
-					saBindingMap = scan.GetSaBinding2()
+					saBindingMap = scan.GetSaBinding()
 				}
 				for sa, permission := range saBindingMap {
 					fmt.Println("--------------------------------")
@@ -85,9 +82,20 @@ func Main() {
 					fmt.Println("")
 				}
 			}
+		case "resetconfig":
+			{
+				conf.GetConfig()
+				conf.UpdateConfig()
+				conf.GetConfig()
+				ssh = conf.Config.SSH
+
+			}
+
 		case "help":
 			{
-
+				fmt.Println("scan扫描关键ServiceAccount")
+				fmt.Println("exp 利用关键SA的关键权限尝试进行攻击")
+				fmt.Println("resetconfig 支持热重载配置")
 			}
 		}
 	}
@@ -104,23 +112,47 @@ func classify(ControledNode string) map[string][]SA_sort {
 	result := make(map[string][]SA_sort, 0)
 	kind := map[string]string{
 		//createrolebinding*2、patchrolebinding*2、patchrole*2
-		"impersonate": "anyescalate", "createclusterrolebindings": "anyescalate", "patchclusterroles": "anyescalate", "createtokens": "anyescalate", "createpods": "anyescalate", "createpodcontrollers": "anyescalate", "patchpodcontrollers": "anyescalate", "createwebhookconfig": "anyescalate", "patchwebhookconfig": "anyescalate",
-		"createrolebindings": "restrictescalate", "patchclusterrolebindings": "restrictescalate", "patchrolebindings": "restrictescalate", "patchroles": "restrictescalate", "createsecrets": "restrictescalate", "getsecrets": "restrictescalate", "execpods": "restrictescalate", "execpods2": "restrictescalate", "patchpods": "restrictescalate", "watchsecrets": "restrictescalate",
-		"patchnodes": "anyhijack", "deletenodes": "anyhijack", "deletepods": "restricthijack", "createpodeviction": "restricthijack",
+		"impersonate":               "anyescalate",
+		"createclusterrolebindings": "anyescalate",
+		"patchclusterroles":         "anyescalate",
+		"createtokens":              "anyescalate",
+		"createpods":                "anyescalate",
+		"createpodcontrollers":      "anyescalate",
+		"patchpodcontrollers":       "anyescalate",
+		"createwebhookconfig":       "anyescalate",
+		"patchwebhookconfig":        "anyescalate",
+		"createrolebindings":        "restrictescalate",
+		"patchclusterrolebindings":  "restrictescalate",
+		"patchrolebindings":         "restrictescalate",
+		"patchroles":                "restrictescalate",
+		"createsecrets":             "restrictescalate",
+		"getsecrets":                "restrictescalate",
+		"execpods":                  "restrictescalate",
+		"execpods2":                 "restrictescalate",
+		"patchpods":                 "restrictescalate",
+		"watchsecrets":              "restrictescalate",
+		"patchnodes":                "anyhijack",
+		"deletenodes":               "anyhijack",
+		"deletepods":                "restricthijack",
+		"createpodeviction":         "restricthijack",
 	}
 	replacements := map[string]string{
-		"daemonsets": "podcontrollers", "deployments": "podcontrollers", "statefulsets": "podcontrollers", "replicasets": "podcontrollers", "jobs": "podcontrollers", "cronjobs": "podcontrollers", "replicationcontrollers": "podcontrollers",
-		"mutatingwebhookconfigurations": "webhookconfig", "validatingwebhookconfigurations": "webhookconfig",
+		"daemonsets":                      "podcontrollers",
+		"deployments":                     "podcontrollers",
+		"statefulsets":                    "podcontrollers",
+		"replicasets":                     "podcontrollers",
+		"jobs":                            "podcontrollers",
+		"cronjobs":                        "podcontrollers",
+		"replicationcontrollers":          "podcontrollers",
+		"mutatingwebhookconfigurations":   "webhookconfig",
+		"validatingwebhookconfigurations": "webhookconfig",
 	}
 	if len(saBindingMap) == 0 {
-		saBindingMap = scan.GetSaBinding2()
+		saBindingMap = scan.GetSaBinding()
 	}
 	if len(criticalSAs) == 0 {
-		criticalSAs = scan.GetCriticalSA(scan.NewGetSA2(saBindingMap), ssh.Nodename)
+		criticalSAs = scan.GetCriticalSA(scan.GetSA(saBindingMap), ssh.Nodename)
 	}
-	// if len(criticalSAs) == 0 {
-	// 	criticalSAs = scan.GetCriticalSA(scan.GetSA(scan.GetSaBinding()), ssh.Nodename)
-	// }
 	criticalSAsWrappers := []models.CriticalSAWrapper{}
 	for _, criticalSA := range criticalSAs {
 		for _, criticalSAType := range criticalSA.Type {
@@ -156,12 +188,8 @@ func classify(ControledNode string) map[string][]SA_sort {
 			tmpType = "dos"
 		}
 		if criticalSA.Crisa.Level == "namespace" && !strings.Contains(criticalSA.Type, "kube-system") {
-			//newResult = map[string]structure.CriticalSA{"restrict" + tmpType + "-" + criticalSA.Type: criticalSA} //In the case of restrictions, existing restrictions are listed to provide options.
 			newResult = SA_sort{Level: "restrict" + tmpType + "-" + criticalSA.Type, SA: criticalSA, dispatchFunc: dispatchfunc}
 		}
-		// if newResult.SA.InNode {
-		// 	result[tmpType] = append(result[tmpType], newResult)
-		// }
 		result[tmpType] = append(result[tmpType], newResult)
 	}
 	for k, _ := range result {
@@ -286,7 +314,7 @@ func dispatch(sa models.CriticalSA, dispatchFunc string) {
 }
 
 type SA_sort struct {
-	Level        string                      //Key used to sort by (any, restrict)
-	dispatchFunc string                      //key used to call the function
+	Level        string                   //Key used to sort by (any, restrict)
+	dispatchFunc string                   //key used to call the function
 	SA           models.CriticalSAWrapper //Actual SA information
 }

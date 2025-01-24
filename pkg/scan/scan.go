@@ -2,77 +2,30 @@ package scan
 
 import (
 	"fmt"
-	utils "k8sEPDS/pkg/scan/utils"
-	structure "k8sEPDS/models"
+	"k8sEPDS/models"
+	"k8sEPDS/pkg/scan/utils"
 	"strings"
 )
 
-// Get SAs (SAs mounted in Pod)
-func GetSA(saBindingMap map[string]map[string][]string) map[string]*structure.SA {
-	// Collect all SAs and their bound Roles
-	result := make(map[string]*structure.SA, 0)
-	pods, err := utils.GetPods()
-	if err != nil {
-		fmt.Println("[Get pods] failed: ", err.Error())
-	}
-	for _, pod := range pods {
-		SA := structure.SA{
-			Name:       pod.Namespace + "/" + pod.ServiceAccount,
-			SAPod:      pod,
-			Permission: saBindingMap[pod.Namespace+"/"+pod.ServiceAccount],
-		}
-		result[pod.Namespace+"/"+pod.ServiceAccount] = &SA
-	}
-
-	return result
-
-}
-
-// Get all SAs and mark whether to mount them
-func GetSA2(saBindingMap map[string]map[string][]string) map[string]*structure.SA {
-	result := make(map[string]*structure.SA, 0)
-	for sa, per := range saBindingMap {
-		SA := structure.SA{
-			Name:       sa,
-			Permission: per,
-		}
-		result[sa] = &SA
-	}
-	pods, err := utils.GetPods()
-	if err != nil {
-		fmt.Println("[Get pods] failed: ", err.Error())
-	}
-	for _, pod := range pods {
-		_, exists := result[pod.Namespace+"/"+pod.ServiceAccount]
-		if exists {
-			result[pod.Namespace+"/"+pod.ServiceAccount].IsMounted = true
-			result[pod.Namespace+"/"+pod.ServiceAccount].SAPod = pod
-		}
-
-	}
-	return result
-}
-
-func NewGetSA2(sas map[string]*structure.SA) map[string]*structure.SA {
+// GetSA 获取并标记已经挂在的ServiceAccount
+func GetSA(sas map[string]*models.SA) map[string]*models.SA {
 	result := sas
 	pods, err := utils.GetPods()
 	if err != nil {
 		fmt.Println("[Get pods] failed: ", err.Error())
 	}
 	for _, pod := range pods {
-		_, exists := result[pod.Namespace+"/"+pod.ServiceAccount]
-		if exists {
-			result[pod.Namespace+"/"+pod.ServiceAccount].IsMounted = true
-			result[pod.Namespace+"/"+pod.ServiceAccount].SAPod = pod
+		key := pod.Namespace + "/" + pod.ServiceAccount
+		if sa, exists := result[key]; exists {
+			sa.IsMounted = true
+			sa.SAPod = pod
 		}
-
 	}
 	return result
 }
-
 // Filter high-privilege SA and mark whether the high-privilege SA is in the controlled node.
-func GetCriticalSA(SAs map[string]*structure.SA, ControledNode string) []structure.CriticalSA {
-	result := []structure.CriticalSA{}
+func GetCriticalSA(SAs map[string]*models.SA, ControledNode string) []models.CriticalSA {
+	result := []models.CriticalSA{}
 	for _, sa := range SAs {
 		clusterrolebindFlag1 := 0
 		clusterrolebindFlag2 := 0
@@ -80,7 +33,7 @@ func GetCriticalSA(SAs map[string]*structure.SA, ControledNode string) []structu
 		rolebindFlag2 := 0
 		clusterroleescalateFlag := 0
 		roleescalateFlag := 0
-		criticalSA := structure.CriticalSA{
+		criticalSA := models.CriticalSA{
 			SA0:    *sa,
 			InNode: false,
 			Level:  "namespace",
@@ -93,13 +46,6 @@ func GetCriticalSA(SAs map[string]*structure.SA, ControledNode string) []structu
 					criticalSA.InNode = true
 				}
 				rawType := ""
-				// if utils.Contains(v, "create") || utils.Contains(v, "*") {
-				// 	if strings.Contains(k, "serviceaccounts") || strings.Contains(k, "*") {
-				// 		rawType = "createserviceaccounts"
-				// 		criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(k, rawType, &criticalSA))
-				// 		result = append(result, criticalSA)
-				// 	}
-				// }
 				if utils.Contains(v, "get") || utils.Contains(v, "*") {
 					if strings.Contains(k, "secrets") || strings.Contains(k, "*") {
 						rawType = "getsecrets"
@@ -296,8 +242,6 @@ func GetCriticalSA(SAs map[string]*structure.SA, ControledNode string) []structu
 						rawType = "deletevalidatingwebhookconfigurations"
 						criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(k, rawType, &criticalSA))
 					}
-
-					//criticalSA.Type = append(criticalSA.Type, "delete"+k)
 				}
 
 				if utils.Contains(v, "escalate") || utils.Contains(v, "*") {
@@ -335,76 +279,19 @@ func GetCriticalSA(SAs map[string]*structure.SA, ControledNode string) []structu
 }
 
 // Get SAs (all, whether mounted in the Pod or not)
-func GetSaBinding() map[string]map[string][]string {
+func GetSaBinding() map[string]*models.SA {
 	var SaBindingMap = map[string]map[string][]string{}
+	result := make(map[string]*models.SA)
 	clusterrolebindingList := utils.GetClusterRoleBindings()
 	rolebindingList := utils.GetRolesBindings()
 	for _, clusterrolebinding := range clusterrolebindingList {
 		rules := utils.GetRulesFromRole(clusterrolebinding.RoleRef)
 		for _, sa := range clusterrolebinding.Subject {
-			//tokenMounted := utils.CheckSaTokenMounted(sa)
-			// if !tokenMounted {
-			// 	fmt.Print("%s noMounted", sa)
-			// 	continue
-			// }
-			if _, ok := SaBindingMap[sa]; ok != true {
+			if _, ok := SaBindingMap[sa]; !ok {
 				SaBindingMap[sa] = make(map[string][]string)
 			}
-
-			for _, rule := range rules {
-				for _, res := range rule.Resourcs {
-					if _, ok := SaBindingMap[sa][res]; ok != true {
-						SaBindingMap[sa][res] = make([]string, 0)
-					}
-					for _, verb := range rule.Verbs {
-						SaBindingMap[sa][res] = append(SaBindingMap[sa][res], verb)
-					}
-				}
-			}
-		}
-	}
-
-	for _, rolebinding := range rolebindingList {
-		rules := utils.GetRulesFromRole(rolebinding.RoleRef)
-		for _, sa := range rolebinding.Subject {
-			if _, ok := SaBindingMap[sa]; ok != true {
-				SaBindingMap[sa] = make(map[string][]string)
-			}
-			for _, rule := range rules {
-				for _, res := range rule.Resourcs {
-					res = res + "[" + rolebinding.Namespace + "]" // Pod(pod1)[default]
-					if _, ok := SaBindingMap[sa][res]; ok != true {
-						SaBindingMap[sa][res] = make([]string, 0)
-					}
-					for _, verb := range rule.Verbs {
-						SaBindingMap[sa][res] = append(SaBindingMap[sa][res], verb) //+"["+rolebinding.Namespace+"]"
-					}
-				}
-			}
-		}
-	}
-	return SaBindingMap
-}
-
-func GetSaBinding2() map[string]*structure.SA {
-	var SaBindingMap = map[string]map[string][]string{}
-	var result map[string]*structure.SA
-	result = make(map[string]*structure.SA)
-	clusterrolebindingList := utils.GetClusterRoleBindings()
-	rolebindingList := utils.GetRolesBindings()
-	for _, clusterrolebinding := range clusterrolebindingList {
-		rules := utils.GetRulesFromRole(clusterrolebinding.RoleRef)
-		for _, sa := range clusterrolebinding.Subject {
-			//tokenMounted := utils.CheckSaTokenMounted(sa)
-			// if !tokenMounted {
-			// 	fmt.Print("%s noMounted", sa)
-			// 	continue
-			// }
-			if _, ok := SaBindingMap[sa]; ok != true {
-				SaBindingMap[sa] = make(map[string][]string)
-			}
-			if _, ok := result[sa]; ok != true {
-				result[sa] = &structure.SA{
+			if _, ok := result[sa]; !ok{
+				result[sa] = &models.SA{
 					Name:         sa,
 					RoleBindings: []string{},
 					Roles:        map[string]map[string][]string{},
@@ -413,7 +300,7 @@ func GetSaBinding2() map[string]*structure.SA {
 			result[sa].RoleBindings = append(result[sa].RoleBindings, clusterrolebinding.Name)
 			for _, rule := range rules {
 				for _, res := range rule.Resourcs {
-					if _, ok := result[sa].Roles[clusterrolebinding.RoleRef]; ok != true {
+					if _, ok := result[sa].Roles[clusterrolebinding.RoleRef]; !ok {
 						result[sa].Roles[clusterrolebinding.RoleRef] = make(map[string][]string, 0)
 					}
 					for _, verb := range rule.Verbs {
@@ -429,11 +316,11 @@ func GetSaBinding2() map[string]*structure.SA {
 	for _, rolebinding := range rolebindingList {
 		rules := utils.GetRulesFromRole(rolebinding.RoleRef)
 		for _, sa := range rolebinding.Subject {
-			if _, ok := SaBindingMap[sa]; ok != true {
+			if _, ok := SaBindingMap[sa];!ok{
 				SaBindingMap[sa] = make(map[string][]string)
 			}
-			if _, ok := result[sa]; ok != true {
-				result[sa] = &structure.SA{
+			if _, ok := result[sa]; !ok {
+				result[sa] = &models.SA{
 					Name:         sa,
 					RoleBindings: []string{},
 					Roles:        map[string]map[string][]string{},
@@ -443,7 +330,7 @@ func GetSaBinding2() map[string]*structure.SA {
 			for _, rule := range rules {
 				for _, res := range rule.Resourcs {
 					res = res + "[" + rolebinding.Namespace + "]" // Pod(pod1)[default]
-					if _, ok := result[sa].Roles[rolebinding.RoleRef]; ok != true {
+					if _, ok := result[sa].Roles[rolebinding.RoleRef]; !ok {
 						result[sa].Roles[rolebinding.RoleRef] = make(map[string][]string, 0)
 					}
 					for _, verb := range rule.Verbs {
@@ -461,33 +348,12 @@ func GetSaBinding2() map[string]*structure.SA {
 //ClusterRole1: res
 
 // Get the token of the specified SA in the controlled node.
-func GetCriticalSAToken(sa structure.CriticalSA, ssh structure.SSHConfig) (string, error) { //  /var/lib/kubelet/pods
+func GetCriticalSAToken(sa models.CriticalSA, ssh models.SSHConfig) (string, error) { //  /var/lib/kubelet/pods
 	filePath := "/var/lib/kubelet/pods/" + sa.SA0.SAPod.Uid + "/volumes/kubernetes.io*/*/token"
-	token, err := utils.ReadRemoteFile(ssh.Ip, ssh.Port, ssh.Username, ssh.Password, ssh.PrivateKeyFile, filePath)
+	token, err := utils.ReadRemoteFile(ssh.Host, ssh.Port, ssh.Username, ssh.Password, ssh.PrivateKeyFile, filePath)
 	if err != nil {
 		return "", err
 	} else {
 		return token, nil
 	}
-	// Local file reading
-	// fmt.Print("[msg] useCriticalSa: ", sa, "\n\n")
-	// pattern := "/var/lib/kubelet/pods/" + sa.SA0.SAPod.Uid + "/volumes/kubernetes.io*/*/token"
-	// matches, err := filepath.Glob(pattern)
-	// if err != nil {
-	// 	fmt.Println("An error occurred while locating the file:", err)
-	// 	return ""
-	// }
-	// if len(matches) == 0 {
-	// 	fmt.Println("No files matched.")
-	// 	return ""
-	// }
-	// filePath := matches[0]
-	// //fmt.Println(filePath)
-	// fileContents, err := ioutil.ReadFile(filePath)
-	// if err != nil {
-	// 	fmt.Println("Unable to read file contents:", err)
-	// 	return ""
-	// }
-
-	// return string(fileContents)
 }

@@ -2,7 +2,7 @@
  * @Description:
  * @Author: kingqaquuu
  * @Date: 2025-01-21 16:27:48
- * @LastEditTime: 2025-01-22 17:36:41
+ * @LastEditTime: 2025-01-23 12:21:05
  * @LastEditors: kingqaquuu
  */
 package models
@@ -68,10 +68,24 @@ type CriticalSASet struct {
 }
 
 type SSHConfig struct {
-	Ip             string // SSH连接的目标IP地址
+	Host           string // SSH连接的目标IP地址
 	Port           int    // SSH连接端口
 	Username       string // SSH登录用户名
 	Password       string // SSH登录密码
 	PrivateKeyFile string // SSH私钥文件路径
 	Nodename       string // 目标节点名称
+}
+
+type K8SConfig struct {
+	ApiServer    string //K8s Api服务器地址
+	ProxyAddress string //代理 如果没有留空
+	TokenFile    string //token文件存放位置
+	Kubeconfig   string
+	AdminCert    string //证书
+	AdminCertKey string
+}
+
+type K8sEPDSConfig struct {
+	K8s K8SConfig
+	SSH SSHConfig
 }
