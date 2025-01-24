@@ -1,15 +1,14 @@
-apiServer: "192.168.137.134:6443"
-proxyAddress: "" # When not using a proxy, set it to empty
-auth:
-  - tokenFile: "./auth/token" # Token file path (when token and crt are set at the same time, token authentication takes precedence)
-  - kubeconfig: ""
-  - crt: ""  # crt file path
-    key: ""  # key file path
+k8s:
+  - apiServer: "192.168.137.134:6443" #K8s的api服务器地址
+    proxyAddress: "" # 不用代理请留空
+    tokenFile: "./auth/token" # token的路径 当证书也同时设置 优先使用token
+    kubeconfig: ""
+    crt: ""  # 证书的路径
+    key: ""  # 证书密钥的路径
 ssh:  #Controlled node (token will be obtained on this node)
-  - ip: "192.168.137.136"
-    port: "22"
-    username: "root"
-    password: "123123"
-    privateKeyFile: "" # When passwd and keyFile are set at the same time, private key login is given priority.
-    nodeName: "node2" # Controlled node name
-
+  - host: "192.168.137.136" # SSH连接的HOST
+    port: "22"  # SSH连接的端口
+    username: "root"  # SSH登录的用户名
+    password: "123123" # SSH登录的密码
+    privateKeyFile: "" # 私钥地址，优先使用私钥
+    nodeName: "node2" # 控制的节点名
