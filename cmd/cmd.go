@@ -21,7 +21,13 @@ func Main() {
 	ssh = conf.Config.SSH
 	operation := ""
 	for {
-		fmt.Print("[scan/exp/resetconfig/help] Input the operation: ")
+		fmt.Println("\n可用命令:")
+		fmt.Println("  scan        - 扫描权限")
+		fmt.Println("  exp         - 利用漏洞")
+		fmt.Println("  resetconfig - 重置配置")
+		fmt.Println("  help        - 显示帮助")
+		fmt.Println("  exit        - 退出程序")
+		fmt.Print("请输入命令:")
 		fmt.Scan(&operation)
 		switch operation {
 		case "scan":
@@ -48,39 +54,7 @@ func Main() {
 			}
 		case "exp":
 			{
-				exploit(classify(ssh.Nodename), ssh.Nodename, false)
-			}
-		case "getsa":
-			{
-				fmt.Scan(&operation)
-				if len(saBindingMap) == 0 {
-					saBindingMap = scan.GetSaBinding()
-				}
-				for sa, permission := range saBindingMap {
-					if strings.Contains(sa, operation) {
-						fmt.Println("--------------------------------")
-						fmt.Println(">>>>>", "account"+sa+"permissions", "<<<<<")
-						for res, verb := range permission.Permission {
-							fmt.Println("\t", res, "-->", verb)
-						}
-						break
-					}
-				}
-				fmt.Println()
-			}
-		case "getsas":
-			{
-				if len(saBindingMap) == 0 {
-					saBindingMap = scan.GetSaBinding()
-				}
-				for sa, permission := range saBindingMap {
-					fmt.Println("--------------------------------")
-					fmt.Println(">>>>>", "account"+sa+"permissions", "<<<<<")
-					for res, verb := range permission.Permission {
-						fmt.Println("\t", res, "-->", verb)
-					}
-					fmt.Println("")
-				}
+				exploit(classify(), ssh.Nodename, false)
 			}
 		case "resetconfig":
 			{
@@ -88,21 +62,27 @@ func Main() {
 				conf.UpdateConfig()
 				conf.GetConfig()
 				ssh = conf.Config.SSH
-
 			}
-
 		case "help":
-			{
-				fmt.Println("scan扫描关键ServiceAccount")
-				fmt.Println("exp 利用关键SA的关键权限尝试进行攻击")
-				fmt.Println("resetconfig 支持热重载配置")
-			}
-		}
+            showHelp()
+        case "exit":
+            return 
+        default:
+            fmt.Println("无效的命令，请使用 help 查看可用命令")
+        }
 	}
-
 }
 
-func classify(ControledNode string) map[string][]SA_sort {
+func showHelp(){
+	fmt.Println("\n可用命令:")
+    fmt.Println("  scan        - 扫描关键ServiceAccount")
+    fmt.Println("  exp         - 利用关键SA的关键权限进行攻击")
+    fmt.Println("  resetconfig - 重新加载配置")
+    fmt.Println("  help        - 显示帮助信息")
+    fmt.Println("  exit        - 退出程序")
+}
+
+func classify() map[string][]SA_sort {
 	/*
 		{
 			"escalate": [{"any": CriticalSA},{"restrict: CriticalSA"},...],
@@ -192,7 +172,7 @@ func classify(ControledNode string) map[string][]SA_sort {
 		}
 		result[tmpType] = append(result[tmpType], newResult)
 	}
-	for k, _ := range result {
+	for k := range result {
 		sort.Slice(result[k], func(i, j int) bool {
 			return result[k][i].Level < result[k][j].Level
 		})
@@ -207,10 +187,10 @@ func exploit(payloads map[string][]SA_sort, ControledNode string, hijacked bool)
 	for _, sa := range payloads["escalate"] {
 		if strings.Contains(sa.Level, "any") {
 			if cnt == 0 {
-				fmt.Println("[√] privilege escalation. The available permissions are as follows:")
+				fmt.Println("[√] 发现权限提升漏洞，可用权限如下：")
 				fmt.Println("---------------------------")
 			}
-			fmt.Println(cnt, sa.SA.Type, "use SA:", sa.SA.Crisa.SA0.Name)
+			fmt.Println(cnt, sa.SA.Type, "使用SA:", sa.SA.Crisa.SA0.Name)
 			anyescalateMap[cnt] = sa
 			cnt++
 		}
@@ -218,19 +198,21 @@ func exploit(payloads map[string][]SA_sort, ControledNode string, hijacked bool)
 	if len(anyescalateMap) != 0 {
 		var choice int
 		fmt.Println("---------------------------")
-		fmt.Print("[input] Choose a privilege escalation type: ")
+		fmt.Print("[输入] 选择权限提升类型: ")
 		fmt.Scan(&choice)
-		fmt.Println("[msg] Coming soon", "account"+anyescalateMap[choice].SA.Crisa.SA0.Name, "(permissions"+anyescalateMap[choice].SA.Type+")", "Perform privilege escalation")
+		fmt.Printf("[msg] 即将使用账户%s(权限%s)执行权限提升\n",
+		anyescalateMap[choice].SA.Crisa.SA0.Name, 
+		anyescalateMap[choice].SA.Type)
 		dispatch(anyescalateMap[choice].SA.Crisa, anyescalateMap[choice].dispatchFunc)
 		return
 	}
 	if hijacked {
 		if len(payloads["escalate"]) == 0 {
-			fmt.Println("[X] No available privilege escalation detected")
+			fmt.Println("[X] 未检测到可用的权限提升")
 			return
 		}
-		fmt.Println("[!] Still unable to arbitrarily escalate privileges")
-		fmt.Println("[msg] Prepare a list of some of the privilege escalations that can be made")
+		fmt.Println("[!] 仍然无法任意提升权限")
+		fmt.Println("[msg] 准备列出可用的权限提升选项")
 		fmt.Println("---------------------------")
 		escalateMap := make(map[int]SA_sort)
 		cnt := 0
@@ -240,22 +222,24 @@ func exploit(payloads map[string][]SA_sort, ControledNode string, hijacked bool)
 			cnt++
 		}
 		fmt.Println("---------------------------")
-		fmt.Print("[input] Choose a privilege escalation type: ")
+		fmt.Print("[输入] 选择权限提升类型: ")
 		var choice int
 		fmt.Scan(&choice)
-		fmt.Println("[msg] Coming soon", "account"+escalateMap[choice].SA.Crisa.SA0.Name, "(permissions"+escalateMap[choice].SA.Type+")", "Perform privilege escalation")
+		fmt.Printf("[msg] 即将使用账户%s(权限%s)执行权限提升\n",
+		escalateMap[choice].SA.Crisa.SA0.Name,
+		escalateMap[choice].SA.Type)
 		dispatch(escalateMap[choice].SA.Crisa, escalateMap[choice].dispatchFunc)
 	}
 
 	if !hijacked {
-		fmt.Println("[!] Unable to arbitrarily escalate privileges")
-		fmt.Println("[msg] Prepare to detect 'hijacking' related permissions")
-		hijack(payloads, ControledNode)
+		fmt.Println("[!] 无法直接提升权限")
+        fmt.Println("[msg] 准备检测'劫持'相关权限")
+		hijack(payloads)
 		exploit(payloads, ControledNode, true)
 	}
 }
 
-func hijack(payloads map[string][]SA_sort, ControledNode string) bool {
+func hijack(payloads map[string][]SA_sort, ) bool {
 	if len(payloads["hijack"]) == 0 {
 		fmt.Println("[!] No 'hijack' related permissions detected")
 		return false

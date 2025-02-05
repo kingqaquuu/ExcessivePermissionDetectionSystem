@@ -282,10 +282,10 @@ func GetCriticalSA(SAs map[string]*models.SA, ControledNode string) []models.Cri
 func GetSaBinding() map[string]*models.SA {
 	var SaBindingMap = map[string]map[string][]string{}
 	result := make(map[string]*models.SA)
-	clusterrolebindingList := utils.GetClusterRoleBindings()
-	rolebindingList := utils.GetRolesBindings()
+	clusterrolebindingList,_ := utils.GetClusterRoleBindings()
+	rolebindingList,_ := utils.GetRolesBindings()
 	for _, clusterrolebinding := range clusterrolebindingList {
-		rules := utils.GetRulesFromRole(clusterrolebinding.RoleRef)
+		rules,_ := utils.GetRulesFromRole(clusterrolebinding.RoleRef)
 		for _, sa := range clusterrolebinding.Subject {
 			if _, ok := SaBindingMap[sa]; !ok {
 				SaBindingMap[sa] = make(map[string][]string)
@@ -314,7 +314,7 @@ func GetSaBinding() map[string]*models.SA {
 	}
 
 	for _, rolebinding := range rolebindingList {
-		rules := utils.GetRulesFromRole(rolebinding.RoleRef)
+		rules,_ := utils.GetRulesFromRole(rolebinding.RoleRef)
 		for _, sa := range rolebinding.Subject {
 			if _, ok := SaBindingMap[sa];!ok{
 				SaBindingMap[sa] = make(map[string][]string)
@@ -350,7 +350,7 @@ func GetSaBinding() map[string]*models.SA {
 // Get the token of the specified SA in the controlled node.
 func GetCriticalSAToken(sa models.CriticalSA, ssh models.SSHConfig) (string, error) { //  /var/lib/kubelet/pods
 	filePath := "/var/lib/kubelet/pods/" + sa.SA0.SAPod.Uid + "/volumes/kubernetes.io*/*/token"
-	token, err := utils.ReadRemoteFile(ssh.Host, ssh.Port, ssh.Username, ssh.Password, ssh.PrivateKeyFile, filePath)
+	token, err := utils.ReadRemoteFile(ssh, filePath)
 	if err != nil {
 		return "", err
 	} else {

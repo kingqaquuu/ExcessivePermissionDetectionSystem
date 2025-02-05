@@ -152,13 +152,13 @@ func sendRequest(client *http.Client, url string, opts K8sRequestOption) (string
 	}
 
 	// 设置Token认证
-    if opts.Token != "" {
-        req.Header.Set("Authorization", "Bearer "+opts.Token)
-    }
+	if opts.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+opts.Token)
+	}
 	// 设置其他请求头
-    for key, value := range opts.Header {
-        req.Header.Set(key, value)
-    }
+	for key, value := range opts.Header {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -189,68 +189,3 @@ func isValidMethod(method string) bool {
 	}
 	return validMethods[method]
 }
-
-// func ApiRequest(opts K8sRequestOption) (string, error) {
-// 	if opts.Server == "" {
-// 		opts.Server = conf.Config.K8s.ApiServer
-// 	}
-// 	opts.Method = strings.ToUpper(opts.Method)
-// 	url := "https://" + opts.Server + opts.Api
-// 	client := &http.Client{}
-// 	request, err := http.NewRequest(opts.Method, url, bytes.NewBuffer([]byte(opts.PostData)))
-// 	for key, value := range opts.Header {
-// 		request.Header.Set(key, value)
-// 	}
-//
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	//Priority: opts.token => token file => cert file
-// 	tokenBytes, _ := os.ReadFile(conf.Config.K8s.TokenFile)
-// 	var cert tls.Certificate
-// 	if opts.Token != "" {
-// 	} else if string(tokenBytes) != "" {
-// 		opts.Token = string(tokenBytes)
-// 	} else if opts.Token == "" {
-// 		if opts.cert == "" {
-// 			opts.cert = conf.Config.K8s.AdminCert
-// 		}
-// 		if opts.key == "" {
-// 			opts.key = conf.Config.K8s.AdminCertKey
-// 		}
-// 		cert, err = tls.LoadX509KeyPair(opts.cert, opts.key)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 	}
-// 	if conf.Config.K8s.ProxyAddress != "" {
-// 		proxyURL, _ := netUrl.Parse(conf.Config.K8s.ProxyAddress)
-// 		if opts.Token != "" {
-// 			request.Header.Set("authorization", "Bearer "+opts.Token)
-// 			client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, Proxy: http.ProxyURL(proxyURL)}
-// 		} else {
-// 			client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true, Certificates: []tls.Certificate{cert}}, Proxy: http.ProxyURL(proxyURL)}
-// 		}
-// 	} else {
-// 		if opts.Token != "" {
-// 			request.Header.Set("authorization", "Bearer "+opts.Token)
-// 			client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-// 		} else {
-// 			client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true, Certificates: []tls.Certificate{cert}}}
-// 		}
-// 	}
-//
-// 	resp, err := client.Do(request)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	defer resp.Body.Close()
-// 	content, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return "", err
-// 	}
-//
-// 	res := string(content)
-// 	return res, nil
-// }
