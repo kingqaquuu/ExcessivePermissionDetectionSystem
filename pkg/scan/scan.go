@@ -73,6 +73,12 @@ func  GetCriticalSA(SAs map[string]*models.SA, ControledNode string) []models.Cr
 						criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "watchsecrets", &criticalSA))
 					}
 				}
+				// list secrets
+				if utils.Contains(permissions, "list") || utils.Contains(permissions, "*") {
+					if strings.Contains(resource, "secrets") || strings.Contains(resource, "*") {
+						criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "listsecrets", &criticalSA))
+					}
+				}
 				// patch 权限处理
 				if utils.Contains(permissions, "patch") || utils.Contains(permissions, "*") {
 					// 节点直接添加
@@ -255,6 +261,14 @@ func  GetCriticalSA(SAs map[string]*models.SA, ControledNode string) []models.Cr
 				if utils.Contains(permissions, "update") {
                     criticalSA.Type = append(criticalSA.Type, "update"+resource)
                 }
+				// deletecollection 权限
+				if utils.Contains(permissions, "deletecollection") || utils.Contains(permissions, "*") {
+					criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "deletecollection"+resource, &criticalSA))
+				}
+				// approve 权限
+				if utils.Contains(permissions, "approve") || utils.Contains(permissions, "*") {
+					criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "approve"+resource, &criticalSA))
+}
 			}
 		}
 		// 仅保留存在权限操作的记录
