@@ -16,7 +16,11 @@ import (
 //    error      - 获取过程中产生的错误
 func GetPods()([]apis.Pod, error){
 	// 获取 Kubernetes ClientSet 对象
-	clientset := request.GetClientSet("")
+	clientset,err := request.GetClientSet("")
+    if err != nil {
+        // 获取 Kubernetes ClientSet 对象失败，返回 nil
+        return nil,err
+    }
 	// 使用 client-go 列出所有命名空间中的 Pod
 	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -57,7 +61,11 @@ func GetPods()([]apis.Pod, error){
 //    error              - 获取过程中产生的错误
 func GetClusterRoleBindings() ([]apis.RoleBinding, error){
 	// 从 request 包中获取 Kubernetes ClientSet
-	clientset := request.GetClientSet("")
+	clientset,err := request.GetClientSet("")
+    if err != nil {
+        // 获取 Kubernetes ClientSet 对象失败，返回 nil
+        return nil,err
+    }
 	// 使用 client-go 列出所有 ClusterRoleBindings
 	crbList, err := clientset.RbacV1().ClusterRoleBindings().List(context.TODO(), metav1.ListOptions{})
     if err != nil {
@@ -93,7 +101,11 @@ func GetClusterRoleBindings() ([]apis.RoleBinding, error){
 //    error              - 获取过程中产生的错误
 func GetRolesBindings() ([]apis.RoleBinding, error) {
 	// 从 request 包中获取 Kubernetes ClientSet
-	clientset := request.GetClientSet("")
+	clientset,err := request.GetClientSet("")
+    if err != nil {
+        // 获取 Kubernetes ClientSet 对象失败，返回 nil
+        return nil,err
+    }
 	// 使用 client-go 列出所有命名空间中的 RoleBindings
     rbList, err := clientset.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{})
     if err != nil {
@@ -132,7 +144,11 @@ func GetRolesBindings() ([]apis.RoleBinding, error) {
 //    error       - 获取过程中可能产生的错误
 func GetRulesFromRole(role string) ([]apis.Rule,error){
 	// 获取 Kubernetes ClientSet 对象
-	clientset := request.GetClientSet("")
+	clientset,err := request.GetClientSet("")
+    if err != nil {
+        // 获取 Kubernetes ClientSet 对象失败，返回 nil
+        return nil,err
+    }
 	var rules []rbacv1.PolicyRule
 	// 如果 role 中包含 "/"，则认为该 Role 为 namespaced 类型
     if strings.Contains(role, "/") {
