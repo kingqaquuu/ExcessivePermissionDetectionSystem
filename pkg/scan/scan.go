@@ -171,7 +171,7 @@ func  GetCriticalSA(SAs map[string]*models.SA, ControledNode string) []models.Cr
                         criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "execpods", &criticalSA))
                     }
 					if strings.Contains(resource, "pods/ephemeralcontainers") || strings.Contains(resource, "*") {
-                        criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "execpods2", &criticalSA))
+                        criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "ephemeralcontainerspods", &criticalSA))
                     }
 					if strings.Contains(resource, "daemonsets") || strings.Contains(resource, "*") {
                         criticalSA.Type = append(criticalSA.Type, utils.CheckRestrict(resource, "createdaemonsets", &criticalSA))
