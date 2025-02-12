@@ -57,5 +57,3 @@ K8s过度权限漏洞检测系统，为kingqaquuu毕设所设计
 | createclusterrolebindings             | 绑定 `clusterrolebindings`             | 可能导致未授权权限提升                               |
 | createrolebindings                    | 绑定 `rolebindings`                    | 可能导致普通用户获取管理员权限                       |
 | **approve**                           | 批准操作，如证书签发                   | 可能导致未经授权的证书被签发，影响安全性             |
-
-这样，每个权限下的具体资源都列出来了，你可以更清楚地看到不同权限的详细影响。这样是否符合你的需求？如果有需要调整或补充的，请告诉我！ 😊
