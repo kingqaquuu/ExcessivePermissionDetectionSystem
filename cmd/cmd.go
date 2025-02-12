@@ -17,11 +17,24 @@ var (
 	saBindingMap map[string]*models.SA
 )
 
+// SA_sort 用于封装排序和调度信息
+type SA_sort struct {
+    Level        string                   // 用于排序的关键字（如 any, restrict）
+    dispatchFunc string                   // 调用的函数键
+    SA           models.CriticalSAWrapper // 实际 SA 信息
+}
+
 func Main() {
 	ssh = conf.Config.SSH
 	operation := ""
 	for {
-		fmt.Print("[scan/exp/resetconfig/help] Input the operation: ")
+		fmt.Println("可用命令:")
+		fmt.Println("  scan        - 扫描权限")
+		fmt.Println("  exp         - 利用漏洞")
+		fmt.Println("  resetconfig - 重置配置")
+		fmt.Println("  help        - 显示帮助")
+		fmt.Println("  exit        - 退出程序")
+		fmt.Print("请输入命令:")
 		fmt.Scan(&operation)
 		switch operation {
 		case "scan":
@@ -36,7 +49,7 @@ func Main() {
 					}
 					fmt.Println("[app]:", criticalSA.SA0.SAPod.Namespace)
 					fmt.Println("[component]:", criticalSA.SA0.SAPod.Name)
-					fmt.Println("[SA]:", criticalSA.SA0.Name)
+					fmt.Println("[ServiceAccount]:", criticalSA.SA0.Name)
 					fmt.Println("[permission]:", criticalSA.Type)
 					fmt.Println("[node]:", criticalSA.SA0.SAPod.NodeName)
 					fmt.Println("[roles/clusterRoles]:", criticalSA.Roles)
@@ -44,97 +57,70 @@ func Main() {
 					fmt.Println("-------------------------------------------")
 					fmt.Println()
 				}
-
 			}
 		case "exp":
 			{
-				exploit(classify(ssh.Nodename), ssh.Nodename, false)
-			}
-		case "getsa":
-			{
-				fmt.Scan(&operation)
-				if len(saBindingMap) == 0 {
-					saBindingMap = scan.GetSaBinding()
-				}
-				for sa, permission := range saBindingMap {
-					if strings.Contains(sa, operation) {
-						fmt.Println("--------------------------------")
-						fmt.Println(">>>>>", "account"+sa+"permissions", "<<<<<")
-						for res, verb := range permission.Permission {
-							fmt.Println("\t", res, "-->", verb)
-						}
-						break
-					}
-				}
-				fmt.Println()
-			}
-		case "getsas":
-			{
-				if len(saBindingMap) == 0 {
-					saBindingMap = scan.GetSaBinding()
-				}
-				for sa, permission := range saBindingMap {
-					fmt.Println("--------------------------------")
-					fmt.Println(">>>>>", "account"+sa+"permissions", "<<<<<")
-					for res, verb := range permission.Permission {
-						fmt.Println("\t", res, "-->", verb)
-					}
-					fmt.Println("")
-				}
+				exploit(classify(), ssh.Nodename, false)
 			}
 		case "resetconfig":
 			{
 				conf.GetConfig()
 				conf.UpdateConfig()
-				conf.GetConfig()
 				ssh = conf.Config.SSH
-
 			}
-
 		case "help":
 			{
-				fmt.Println("scan扫描关键ServiceAccount")
-				fmt.Println("exp 利用关键SA的关键权限尝试进行攻击")
-				fmt.Println("resetconfig 支持热重载配置")
+				fmt.Println("可用命令:")
+				fmt.Println("  scan        - 扫描关键ServiceAccount")
+				fmt.Println("  exp         - 利用关键SA的关键权限进行攻击")
+				fmt.Println("  resetconfig - 重新加载配置")
+				fmt.Println("  help        - 显示帮助信息")
+				fmt.Println("  exit        - 退出程序")
 			}
+		case "exit":
+			{
+				fmt.Println("退出程序。")
+                return
+			}
+		default:
+            fmt.Println("无效的命令，请使用 help 查看可用命令")
 		}
 	}
 
 }
 
-func classify(ControledNode string) map[string][]SA_sort {
-	/*
-		{
-			"escalate": [{"any": CriticalSA},{"restrict: CriticalSA"},...],
-			"hijack": [{},{}],
-		}
-	*/
+func classify() map[string][]SA_sort {
 	result := make(map[string][]SA_sort, 0)
 	kind := map[string]string{
-		//createrolebinding*2、patchrolebinding*2、patchrole*2
-		"impersonate":               "anyescalate",
-		"createclusterrolebindings": "anyescalate",
-		"patchclusterroles":         "anyescalate",
-		"createtokens":              "anyescalate",
-		"createpods":                "anyescalate",
-		"createpodcontrollers":      "anyescalate",
-		"patchpodcontrollers":       "anyescalate",
-		"createwebhookconfig":       "anyescalate",
-		"patchwebhookconfig":        "anyescalate",
-		"createrolebindings":        "restrictescalate",
-		"patchclusterrolebindings":  "restrictescalate",
-		"patchrolebindings":         "restrictescalate",
-		"patchroles":                "restrictescalate",
-		"createsecrets":             "restrictescalate",
-		"getsecrets":                "restrictescalate",
-		"execpods":                  "restrictescalate",
-		"execpods2":                 "restrictescalate",
-		"patchpods":                 "restrictescalate",
-		"watchsecrets":              "restrictescalate",
-		"patchnodes":                "anyhijack",
-		"deletenodes":               "anyhijack",
-		"deletepods":                "restricthijack",
-		"createpodeviction":         "restricthijack",
+		"impersonate":               	"anyescalate",
+		"createclusterrolebindings": 	"anyescalate",
+		"patchclusterroles":         	"anyescalate",
+		"createtokens":              	"anyescalate",
+		"createpods":                	"anyescalate",
+		"createpodcontrollers":      	"anyescalate",
+		"patchpodcontrollers":       	"anyescalate",
+		"createwebhookconfig":       	"anyescalate",
+		"patchwebhookconfig":        	"anyescalate",
+		"createrolebindings":        	"restrictescalate",
+		"patchclusterrolebindings":  	"restrictescalate",
+		"patchrolebindings":         	"restrictescalate",
+		"patchroles":                	"restrictescalate",
+		"createsecrets":             	"restrictescalate",
+		"getsecrets":               	"restrictescalate",
+		"listsecrets":					"restrictescalate",
+		"execpods":                  	"restrictescalate",
+		"ephemeralcontainerspods":	 	"restrictescalate",
+		"patchpods":                 	"restrictescalate",
+		"watchsecrets":              	"restrictescalate",
+		"updatesecrets": 			 	"restrictescalate",
+		"updatepods": 					"restrictescalate",
+		"patchnodes":                	"anyhijack",
+		"patchnodestatus":				"anyhijack",
+		"deletenodes":               	"anyhijack",
+		"deletecollections": 			"anyhijack",
+		"deletevalidatingwebhookconfigurations":"anyhijack",
+		"deletepods":                	"restricthijack",
+		"createpodeviction":         	"restricthijack",
 	}
 	replacements := map[string]string{
 		"daemonsets":                      "podcontrollers",
@@ -192,7 +178,7 @@ func classify(ControledNode string) map[string][]SA_sort {
 		}
 		result[tmpType] = append(result[tmpType], newResult)
 	}
-	for k, _ := range result {
+	for k := range result {
 		sort.Slice(result[k], func(i, j int) bool {
 			return result[k][i].Level < result[k][j].Level
 		})
@@ -202,36 +188,41 @@ func classify(ControledNode string) map[string][]SA_sort {
 }
 
 func exploit(payloads map[string][]SA_sort, ControledNode string, hijacked bool) {
+	// 优先处理权限升级中包含 "any" 的选项
 	anyescalateMap := make(map[int]SA_sort)
 	cnt := 0
 	for _, sa := range payloads["escalate"] {
 		if strings.Contains(sa.Level, "any") {
 			if cnt == 0 {
-				fmt.Println("[√] privilege escalation. The available permissions are as follows:")
+				fmt.Println("[√] 发现可用于权限升级的权限，详情如下：")
 				fmt.Println("---------------------------")
 			}
-			fmt.Println(cnt, sa.SA.Type, "use SA:", sa.SA.Crisa.SA0.Name)
-			anyescalateMap[cnt] = sa
+			fmt.Println(cnt, sa.SA.Type, " 使用的 ServiceAccount：", sa.SA.Crisa.SA0.Name)
+            anyescalateMap[cnt] = sa
 			cnt++
 		}
 	}
 	if len(anyescalateMap) != 0 {
 		var choice int
 		fmt.Println("---------------------------")
-		fmt.Print("[input] Choose a privilege escalation type: ")
+		fmt.Print("[输入] 请选择一种权限升级方式（输入 -1 取消）：")
 		fmt.Scan(&choice)
-		fmt.Println("[msg] Coming soon", "account"+anyescalateMap[choice].SA.Crisa.SA0.Name, "(permissions"+anyescalateMap[choice].SA.Type+")", "Perform privilege escalation")
+		if choice == -1{
+			return
+		}
+		fmt.Println("[提示] 即将执行：账户", anyescalateMap[choice].SA.Crisa.SA0.Name, "（权限："+anyescalateMap[choice].SA.Type+"） 的权限升级")
 		dispatch(anyescalateMap[choice].SA.Crisa, anyescalateMap[choice].dispatchFunc)
 		return
 	}
+	// 若已尝试过劫持分支
 	if hijacked {
 		if len(payloads["escalate"]) == 0 {
-			fmt.Println("[X] No available privilege escalation detected")
-			return
+			fmt.Println("[错误] 未检测到可用的权限升级方法")
+            return
 		}
-		fmt.Println("[!] Still unable to arbitrarily escalate privileges")
-		fmt.Println("[msg] Prepare a list of some of the privilege escalations that can be made")
-		fmt.Println("---------------------------")
+		fmt.Println("[警告] 仍无法任意升级权限")
+        fmt.Println("[提示] 以下列出部分可尝试的权限升级方式：")
+        fmt.Println("---------------------------")
 		escalateMap := make(map[int]SA_sort)
 		cnt := 0
 		for _, sa := range payloads["escalate"] {
@@ -240,72 +231,99 @@ func exploit(payloads map[string][]SA_sort, ControledNode string, hijacked bool)
 			cnt++
 		}
 		fmt.Println("---------------------------")
-		fmt.Print("[input] Choose a privilege escalation type: ")
+        fmt.Print("[输入] 请选择一种权限升级方式：")
 		var choice int
 		fmt.Scan(&choice)
-		fmt.Println("[msg] Coming soon", "account"+escalateMap[choice].SA.Crisa.SA0.Name, "(permissions"+escalateMap[choice].SA.Type+")", "Perform privilege escalation")
-		dispatch(escalateMap[choice].SA.Crisa, escalateMap[choice].dispatchFunc)
+		fmt.Println("[提示] 即将执行：账户", escalateMap[choice].SA.Crisa.SA0.Name, "（权限："+escalateMap[choice].SA.Type+"） 的权限升级")
+        dispatch(escalateMap[choice].SA.Crisa, escalateMap[choice].dispatchFunc)
 	}
-
+	// 若还未检测过劫持，则尝试检测劫持相关权限后再次进行权限升级
 	if !hijacked {
-		fmt.Println("[!] Unable to arbitrarily escalate privileges")
-		fmt.Println("[msg] Prepare to detect 'hijacking' related permissions")
-		hijack(payloads, ControledNode)
+		fmt.Println("[提示] 无法任意升级权限")
+        fmt.Println("[提示] 准备用于检测组件劫持相关权限")
+        hijack(payloads)
 		exploit(payloads, ControledNode, true)
 	}
 }
 
-func hijack(payloads map[string][]SA_sort, ControledNode string) bool {
+func hijack(payloads map[string][]SA_sort) bool {
 	if len(payloads["hijack"]) == 0 {
-		fmt.Println("[!] No 'hijack' related permissions detected")
-		return false
+		fmt.Println("[错误] 未检测到与组件劫持相关的权限")
+        return false
 	}
 	anyhijackMap := make(map[int]SA_sort)
 	cnt1 := 0
 	for _, sa := range payloads["hijack"] {
 		if strings.Contains(sa.Level, "any") {
 			if cnt1 == 0 {
-				fmt.Println("[√] Any component can be hijacked, and the available permissions are as follows::")
-				fmt.Println("---------------------------")
-			}
-			fmt.Println(cnt1, sa.SA.Type, sa.SA.Crisa.SA0.Name)
-			anyhijackMap[cnt1] = sa
-			cnt1++
+				fmt.Println("[√] 发现可劫持任意组件的权限，详情如下：")
+                fmt.Println("---------------------------")
+            }
+			fmt.Println(cnt1, sa.SA.Type, " 使用的 ServiceAccount：", sa.SA.Crisa.SA0.Name)
+            anyhijackMap[cnt1] = sa
+            cnt1++
 		}
 	}
 	if len(anyhijackMap) != 0 {
 		var choice int
 		fmt.Println("---------------------------")
-		fmt.Print("[input] Choose a privilege escalation type: ")
-		fmt.Scan(&choice)
-		fmt.Println("[msg] Coming soon", "account"+anyhijackMap[choice].SA.Crisa.SA0.Name, "(permissions"+anyhijackMap[choice].SA.Type+")", "Perform component hijacking")
-		dispatch(anyhijackMap[choice].SA.Crisa, anyhijackMap[choice].dispatchFunc)
-		return true
+		fmt.Print("[输入] 请选择一种劫持方式：")
+        fmt.Scan(&choice)
+        fmt.Println("[提示] 即将执行：账户", anyhijackMap[choice].SA.Crisa.SA0.Name, "（权限："+anyhijackMap[choice].SA.Type+"） 的组件劫持")
+        dispatch(anyhijackMap[choice].SA.Crisa, anyhijackMap[choice].dispatchFunc)
+        return true
 	}
-	fmt.Println("[!] Only certain components can be hijacked")
-	fmt.Println("[msg] Prepare to list specific components that can be hijacked")
-	fmt.Println("---------------------------")
+	fmt.Println("[提示] 仅检测到部分组件可被劫持")
+    fmt.Println("[提示] 以下列出可劫持的组件：")
+    fmt.Println("---------------------------")
 	hijackMap := make(map[int]SA_sort)
 	cnt2 := 0
 	for _, sa := range payloads["hijack"] {
-		fmt.Println(cnt2, sa.SA.Type, sa.SA.Crisa.SA0.Name)
-		hijackMap[cnt2] = sa
-		cnt2++
-	}
+        fmt.Println(cnt2, sa.SA.Type, " 使用的 ServiceAccount：", sa.SA.Crisa.SA0.Name)
+        hijackMap[cnt2] = sa
+        cnt2++
+    }
 	fmt.Println("---------------------------")
-	fmt.Print("[input] Choose a hijacking type: ")
+    fmt.Print("[输入] 请选择一种劫持方式：")
 	var choice int
 	fmt.Scan(&choice)
-	fmt.Println("[msg] Coming soon", "account"+hijackMap[choice].SA.Crisa.SA0.Name, "(permissions"+hijackMap[choice].SA.Type+")", "Perform component hijacking")
-	dispatch(hijackMap[choice].SA.Crisa, hijackMap[choice].dispatchFunc)
-	return true
+	fmt.Println("[提示] 即将执行：账户", hijackMap[choice].SA.Crisa.SA0.Name, "（权限："+hijackMap[choice].SA.Type+"） 的组件劫持")
+    dispatch(hijackMap[choice].SA.Crisa, hijackMap[choice].dispatchFunc)
+    return true
 }
 
 func dispatch(sa models.CriticalSA, dispatchFunc string) {
 	funcMap := map[string]interface{}{
-		"impersonate": exp.Impersonate, "createclusterrolebindings": exp.Createclusterrolebindings, "patchclusterroles": exp.Patchclusterroles, "createtokens": exp.Createtokens, "createpods": exp.Createpods, "createpodcontrollers": exp.Createpodcontrollers, "patchpodcontrollers": exp.Patchpodcontrollers,
-		"createrolebindings": exp.Createrolebindings, "patchclusterrolebindings": exp.Patchclusterrolebindings, "patchrolebindings": exp.Patchrolebindings, "patchroles": exp.Patchroles, "createsecrets": exp.Createsecrets, "getsecrets": exp.Getsecrets, "execpods": exp.Execpods, "execpods2": exp.Execpods2, "patchpods": exp.Patchpods,
-		"patchnodes": exp.Patchnodes, "deletepods": exp.Deletepods, "createpodeviction": exp.Createpodeviction, "deletenodes": exp.Deletenodes, "watchsecrets": exp.WatchSecrets, "patchwebhookconfig": exp.Patchwebhookconfig, "createwebhookconfig": exp.Createwebhookconfig,
+		"createsecrets":exp.Createsecrets,
+		"createpods": exp.Createpods, 
+		"createtokens": exp.Createtokens, 
+		"createclusterrolebindings": exp.Createclusterrolebindings, 
+		"createrolebindings": exp.Createrolebindings, 
+		"createpodeviction": exp.Createpodeviction, 
+		"createpodcontrollers": exp.Createpodcontrollers, 
+		"createwebhookconfig": exp.Createwebhookconfig,
+		"deletepods": exp.Deletepods, 
+		"deletenodes": exp.Deletenodes,
+		"deletevalidatingwebhookconfigurations":exp.Deletevalidatingwebhookconfigurations,
+		"deletecollections": exp.Deletecollections,
+		"getsecrets": exp.Getsecrets, 
+		"listsecrets":exp.Listsecrets,
+		"patchclusterroles": exp.Patchclusterroles, 
+		"patchroles": exp.Patchroles, 
+		"patchclusterrolebindings": exp.Patchclusterrolebindings, 
+		"patchrolebindings": exp.Patchrolebindings, 
+		"patchnodes": exp.Patchnodes, 
+		"patchnodestatus": exp.Patchnodestatus,
+		"patchpods": exp.Patchpods,
+		"patchpodcontrollers": exp.Patchpodcontrollers,
+		"patchwebhookconfig": exp.Patchwebhookconfig, 
+		"watchsecrets": exp.WatchSecrets, 
+		"impersonate": exp.Impersonate, 
+		"execpods": exp.Execpods, 
+		"ephemeralcontainerspods": exp.Ephemeralcontainerspods, 
+		"updatesecrets": exp.UpdateSecrets,
+		"updatepods": exp.UpdatePods,
+		
 	}
 	funcValue := reflect.ValueOf(funcMap[dispatchFunc])
 	args := []reflect.Value{reflect.ValueOf([]models.CriticalSA{sa}), reflect.ValueOf(ssh)}
@@ -313,8 +331,4 @@ func dispatch(sa models.CriticalSA, dispatchFunc string) {
 	funcValue.Call(args)
 }
 
-type SA_sort struct {
-	Level        string                   //Key used to sort by (any, restrict)
-	dispatchFunc string                   //key used to call the function
-	SA           models.CriticalSAWrapper //Actual SA information
-}
+
